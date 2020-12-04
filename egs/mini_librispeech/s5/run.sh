@@ -9,7 +9,7 @@ lm_url=www.openslr.org/resources/11
 . ./cmd.sh
 . ./path.sh
 
-stage=0
+stage=9
 . utils/parse_options.sh
 
 set -euo pipefail
@@ -21,10 +21,12 @@ for part in dev-clean-2 train-clean-5; do
 done
 
 if [ $stage -le 0 ]; then
+  echo "###### STAGE 0 ######"
   local/download_lm.sh $lm_url $data data/local/lm
 fi
 
 if [ $stage -le 1 ]; then
+  echo "###### STAGE 1 ######"
   # format the data as Kaldi data directories
   for part in dev-clean-2 train-clean-5; do
     # use underscore-separated names in data directories.
@@ -44,6 +46,8 @@ if [ $stage -le 1 ]; then
 fi
 
 if [ $stage -le 2 ]; then
+  echo "###### STAGE 2 ######"
+
   mfccdir=mfcc
   # spread the mfccs over various machines, as this data-set is quite large.
   if [[  $(hostname -f) ==  *.clsp.jhu.edu ]]; then
@@ -64,6 +68,8 @@ fi
 
 # train a monophone system
 if [ $stage -le 3 ]; then
+  echo "###### STAGE 3 ######"
+
   # TODO(galv): Is this too many jobs for a smaller dataset?
   steps/train_mono.sh --boost-silence 1.25 --nj 5 --cmd "$train_cmd" \
     data/train_500short data/lang_nosp exp/mono
@@ -74,6 +80,8 @@ fi
 
 # train a first delta + delta-delta triphone system on all utterances
 if [ $stage -le 4 ]; then
+  echo "###### STAGE 4 ######"
+
   steps/train_deltas.sh --boost-silence 1.25 --cmd "$train_cmd" \
     2000 10000 data/train_clean_5 data/lang_nosp exp/mono_ali_train_clean_5 exp/tri1
 
@@ -83,6 +91,8 @@ fi
 
 # train an LDA+MLLT system.
 if [ $stage -le 5 ]; then
+  echo "###### STAGE 5 ######"
+
   steps/train_lda_mllt.sh --cmd "$train_cmd" \
     --splice-opts "--left-context=3 --right-context=3" 2500 15000 \
     data/train_clean_5 data/lang_nosp exp/tri1_ali_train_clean_5 exp/tri2b
@@ -94,6 +104,8 @@ fi
 
 # Train tri3b, which is LDA+MLLT+SAT
 if [ $stage -le 6 ]; then
+  echo "###### STAGE 6 ######"
+
   steps/train_sat.sh --cmd "$train_cmd" 2500 15000 \
     data/train_clean_5 data/lang_nosp exp/tri2b_ali_train_clean_5 exp/tri3b
 fi
@@ -101,6 +113,7 @@ fi
 # Now we compute the pronunciation and silence probabilities from training data,
 # and re-create the lang directory.
 if [ $stage -le 7 ]; then
+  echo "###### STAGE 7 ######"
   steps/get_prons.sh --cmd "$train_cmd" \
     data/train_clean_5 data/lang_nosp exp/tri3b
   utils/dict_dir_add_pronprobs.sh --max-normalize true \
@@ -122,6 +135,7 @@ fi
 
 
 if [ $stage -le 8 ]; then
+  echo "###### STAGE 8 ######"
   # Test the tri3b system with the silprobs and pron-probs.
 
   # decode using the tri3b model
@@ -141,6 +155,7 @@ fi
 
 # Train a chain model
 if [ $stage -le 9 ]; then
+  echo "###### STAGE 9 ######"
   local/chain2/run_tdnn.sh
 fi
 
